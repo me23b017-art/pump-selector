@@ -25,7 +25,6 @@
   .header-tag { font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.6rem; }
   .header h1 { font-family: var(--font-head); font-size: clamp(1.6rem,4vw,2.4rem); font-weight: 700; color: #fff; line-height: 1.1; }
   .header h1 span { color: var(--accent); }
-  .header p { margin-top: 0.5rem; font-size: 13px; color: var(--muted); }
   .main { display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 130px); }
   @media(max-width:800px){ .main { grid-template-columns: 1fr; } }
   .sidebar { padding: 2rem; border-right: 1px solid var(--border); background: var(--surface); }
@@ -83,7 +82,7 @@
   .compare-table td.label { color: var(--muted); font-size: 12px; }
   .chart-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; margin-bottom: 1.5rem; }
   .chart-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 1rem; }
-  .chart-wrap { position: relative; height: 160px; }
+  .chart-wrap { position: relative; height: 180px; }
   .ns-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-top: 0.8rem; }
   .ns-badge.radial { background: rgba(74,240,180,0.15); color: var(--accent); }
   .ns-badge.mixed  { background: rgba(96,165,250,0.15); color: var(--blue); }
@@ -133,14 +132,14 @@
 
     <div class="pump-db">
       <div class="section-label">// Pump Database (10 pumps)</div>
-      <div class="db-row head"><span>Pump</span><span>H₀ (m)</span><span>RPM</span></div>
+      <div class="db-row head"><span>Pump</span><span>H&#8320; (m)</span><span>RPM</span></div>
       <div id="dbList"></div>
     </div>
   </div>
 
   <div class="content">
     <div class="empty-state" id="emptyState">
-      <div class="empty-icon">⚙</div>
+      <div class="empty-icon">&#9881;</div>
       <p>Set parameters and click <strong>Run Selection</strong></p>
       <p style="margin-top:0.5rem;font-size:11px;">Algorithm: Q-window scan, multistage series (up to 5)</p>
     </div>
@@ -165,11 +164,11 @@
       </div>
 
       <div class="chart-section">
-        <div class="chart-title">// H-Q Curve — Selected Pump (per stage)</div>
+        <div class="chart-title">// H-Q Curve &#8212; Selected Pump (per stage)</div>
         <div class="chart-wrap"><canvas id="hqChart"></canvas></div>
       </div>
       <div class="chart-section">
-        <div class="chart-title">// Efficiency Curve — Selected Pump</div>
+        <div class="chart-title">// Efficiency Curve &#8212; Selected Pump</div>
         <div class="chart-wrap"><canvas id="etaChart"></canvas></div>
       </div>
 
@@ -178,7 +177,7 @@
         <div class="pump-row header-row">
           <span>#</span><span>Model</span>
           <span style="text-align:right">H tot (m)</span>
-          <span style="text-align:right"><span style="font-family:serif">η</span> (%)</span>
+          <span style="text-align:right"><span style="font-family:serif">&#951;</span> (%)</span>
           <span style="text-align:right">RPM</span>
           <span style="text-align:right">Stages</span>
         </div>
@@ -221,7 +220,7 @@ function linspace(a, b, n) {
 function poly2(coeffs, Q) { return coeffs[0]*Q*Q + coeffs[1]*Q + coeffs[2]; }
 
 function pump_selector(V_in, H_in) {
-  const NUM_PTS   = 500;
+  const NUM_PTS    = 500;
   const MAX_STAGES = 5;
   const num_pumps  = H_coeffs.length;
 
@@ -241,35 +240,30 @@ function pump_selector(V_in, H_in) {
   for (let i = 0; i < NUM_PTS; i++) { const d = Math.abs(Q[i]-V_cutoff); if (d<minDq){minDq=d; qIdx=i;} }
   const max_window = qIdx - p + 1;
 
-  // Step 4: Score each pump — true max eta across full window [p,qIdx]
+  // Step 4: full-window max eta
   const eta_f       = new Array(num_pumps).fill(0);
   const viable_mask = new Array(num_pumps).fill(false);
   for (let l = 0; l < num_pumps; l++) {
     eta_f[l] = Math.max(...eta[l].slice(p, qIdx+1));
-    const H_at_p = H[l][p];
-    const H_at_q = H[l][qIdx];
-    viable_mask[l] = (MAX_STAGES * Math.max(H_at_p, H_at_q)) > H_in;
+    viable_mask[l] = (MAX_STAGES * Math.max(H[l][p], H[l][qIdx])) > H_in;
   }
 
-  const sort_idx = Array.from({length: num_pumps}, (_,i)=>i)
-                        .sort((a,b) => eta_f[b] - eta_f[a]);
-  const viable_sorted  = sort_idx.filter(i => viable_mask[i]);
-  const num_viable     = viable_sorted.length;
+  const sort_idx     = Array.from({length: num_pumps}, (_,i)=>i).sort((a,b) => eta_f[b] - eta_f[a]);
+  const viable_sorted = sort_idx.filter(i => viable_mask[i]);
+  const num_viable    = viable_sorted.length;
 
   if (num_viable === 0) {
-    return { V_selected:0, H_selected:0, eta_max:0, RPM_selected:0, num_stages:0,
-             found:false, msg:`No pump can meet ${H_in} m even at ${MAX_STAGES} stages.` };
+    return { found:false, msg:`No pump can meet ${H_in} m even at ${MAX_STAGES} stages.` };
   }
 
-  // Step 5: Precompute flag1 and eta_stages indexed by viable rank
+  // Step 5: precompute flag1 / eta_stages by viable rank
   const flag1      = Array.from({length: num_viable}, () => new Array(MAX_STAGES).fill(0));
   const eta_stages = Array.from({length: num_viable}, () => new Array(MAX_STAGES).fill(0));
   for (let b = 0; b < num_viable; b++) {
     const pump_b = viable_sorted[b];
     const H_rep  = Math.max(H[pump_b][p], H[pump_b][qIdx]);
     for (let c = 0; c < MAX_STAGES; c++) {
-      const stages = c + 1;
-      if (stages * H_rep > H_in) {
+      if ((c+1) * H_rep > H_in) {
         flag1[b][c] = 1;
         eta_stages[b][c] = Math.pow(0.9, c) * Math.max(...eta[pump_b].slice(p, qIdx+1));
       }
@@ -284,178 +278,185 @@ function pump_selector(V_in, H_in) {
     const pump_idx = viable_sorted[k];
     j = 0;
 
-    // Single stage check
+    // Single stage
     for (let i = p; i <= qIdx; i++) {
-      if (H[pump_idx][i] > H_in) {
-        H_new[j]   = H[pump_idx][i];
-        eta_new[j] = eta[pump_idx][i];
-        j++;
-      } else {
-        break;
-      }
+      if (H[pump_idx][i] > H_in) { H_new[j] = H[pump_idx][i]; eta_new[j] = eta[pump_idx][i]; j++; }
+      else break;
     }
+    if (j === max_window) { selected_idx = pump_idx; num_stages = 1; found = true; break; }
 
-    if (j === max_window) {
-      selected_idx = pump_idx;
-      num_stages   = 1;
-      found        = true;
-      break;
-    } else {
-      // Multistage check
-      for (let a = 2; a <= MAX_STAGES; a++) {
-        const H_rep_k        = Math.max(H[pump_idx][p], H[pump_idx][qIdx]);
-        const H_multistage   = a * H_rep_k;
-        const eta_multistage = Math.pow(0.9, a-1) * Math.max(...eta[pump_idx].slice(p, qIdx+1));
+    // Multistage
+    for (let a = 2; a <= MAX_STAGES; a++) {
+      const H_rep_k      = Math.max(H[pump_idx][p], H[pump_idx][qIdx]);
+      const H_multistage = a * H_rep_k;
+      const eta_ms       = Math.pow(0.9, a-1) * Math.max(...eta[pump_idx].slice(p, qIdx+1));
+      if (H_multistage <= H_in) continue;
 
-        if (H_multistage <= H_in) continue;
-
-        // Find best alternative from remaining viable pumps
-        let best_alt_eta   = 0;
-        let best_alt_rank  = k;
-        let best_alt_stage = a;
-        for (let e = k+1; e < num_viable; e++) {
-          for (let f = 0; f < MAX_STAGES; f++) {
-            if (flag1[e][f] === 1 && eta_stages[e][f] > best_alt_eta) {
-              best_alt_eta   = eta_stages[e][f];
-              best_alt_rank  = e;
-              best_alt_stage = f + 1;
-            }
+      let best_alt_eta = 0, best_alt_rank = k, best_alt_stage = a;
+      for (let e = k+1; e < num_viable; e++) {
+        for (let f = 0; f < MAX_STAGES; f++) {
+          if (flag1[e][f] === 1 && eta_stages[e][f] > best_alt_eta) {
+            best_alt_eta = eta_stages[e][f]; best_alt_rank = e; best_alt_stage = f+1;
           }
         }
-
-        // Decision: current multistage vs best alternative
-        let use_current = false;
-        if (H_multistage < 1.2 * H_in) {
-          use_current = (eta_multistage >= best_alt_eta);
-        } else {
-          use_current = (best_alt_eta < 0.9 * eta_multistage);
-        }
-
-        const pump_sel  = use_current ? pump_idx : viable_sorted[best_alt_rank];
-        const stage_sel = use_current ? a        : best_alt_stage;
-
-        j = 0;
-        for (let i = p; i <= qIdx; i++) {
-          H_new[j]   = H[pump_sel][i];
-          eta_new[j] = Math.pow(0.9, stage_sel-1) * eta[pump_sel][i];
-          j++;
-        }
-        selected_idx = pump_sel;
-        num_stages   = stage_sel;
-        found        = true;
-        break;
       }
-      if (found) break;
+
+      let use_current = H_multistage < 1.2*H_in ? (eta_ms >= best_alt_eta) : (best_alt_eta < 0.9*eta_ms);
+      const pump_sel  = use_current ? pump_idx            : viable_sorted[best_alt_rank];
+      const stage_sel = use_current ? a                   : best_alt_stage;
+
+      j = 0;
+      for (let i = p; i <= qIdx; i++) {
+        H_new[j] = H[pump_sel][i];
+        eta_new[j] = Math.pow(0.9, stage_sel-1) * eta[pump_sel][i];
+        j++;
+      }
+      selected_idx = pump_sel; num_stages = stage_sel; found = true; break;
     }
+    if (found) break;
   }
 
   if (found && j > 0) {
-    const H_filled   = H_new.slice(0, j);
-    const eta_filled = eta_new.slice(0, j);
+    const H_filled = H_new.slice(0,j), eta_filled = eta_new.slice(0,j);
     let eta_max_val = -Infinity, r = 0;
-    for (let i = 0; i < j; i++) { if (eta_filled[i] > eta_max_val) { eta_max_val = eta_filled[i]; r = i; } }
+    for (let i = 0; i < j; i++) if (eta_filled[i] > eta_max_val) { eta_max_val = eta_filled[i]; r = i; }
     return {
-      V_selected:   Q[p + r],
-      H_selected:   H_filled[r],
-      eta_max:      eta_max_val,
-      RPM_selected: Pump_RPMs[selected_idx],
-      num_stages,
-      selected_idx,
-      found: true,
-      Q, H, eta, p, qIdx
+      V_selected: Q[p+r], H_selected: H_filled[r], eta_max: eta_max_val,
+      RPM_selected: Pump_RPMs[selected_idx], num_stages, selected_idx,
+      found: true, Q, H, eta, p, qIdx
     };
   }
-  return { V_selected:0, H_selected:0, eta_max:0, RPM_selected:0, num_stages:0,
-           found:false, msg:'No valid pump or multistage configuration found.' };
+  return { found:false, msg:'No valid pump or multistage configuration found.' };
+}
+
+// ── vertical-line helper ──────────────────────────────────────────────────
+// Returns a dataset that is non-null only at the single label closest to targetQ,
+// with yValue at that point — creating a true single-pixel vertical spike.
+function vlineDataset(Qfull, targetQ, yValues, color, label) {
+  const step = Qfull[1] - Qfull[0];
+  // find the index closest to targetQ
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < Qfull.length; i++) {
+    const d = Math.abs(Qfull[i] - targetQ);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  // build a dataset that spans the full y range at that one x index
+  // by setting yMin..yMax we make it look like a vertical line using
+  // a scatter point + an error-bar workaround via two overlapping points.
+  // Simplest reliable approach: use a bar dataset on a secondary axis — 
+  // but easiest with plain Chart.js 4 is to set every point null except
+  // the matching index, then set a large pointRadius so it looks like a line.
+  // Actually the cleanest is to just duplicate the dataset for a tall range.
+  // We'll go with the "fill-to-zero" spike: set the one point to yMax of the chart.
+  const yMax = Math.max(...yValues.filter(v => v !== null));
+  return {
+    label,
+    data: Qfull.map((_, i) => i === best ? yMax * 1.05 : null),
+    borderColor: color,
+    borderWidth: 2,
+    borderDash: [5, 4],
+    pointRadius: 0,
+    fill: { target: { value: 0 }, above: color + '22', below: 'transparent' },
+    tension: 0,
+    spanGaps: false,
+    order: 2
+  };
+}
+
+function dotDataset(Qfull, targetQ, yValue, color, label) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < Qfull.length; i++) {
+    const d = Math.abs(Qfull[i] - targetQ);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return {
+    label,
+    data: Qfull.map((_, i) => i === best ? yValue : null),
+    borderColor: color,
+    backgroundColor: color,
+    borderWidth: 0,
+    pointRadius: 7,
+    pointHoverRadius: 9,
+    fill: false,
+    order: 1
+  };
 }
 
 function drawHQ(res, Q_req) {
   const ctx = document.getElementById('hqChart').getContext('2d');
   if (hqChartInst) hqChartInst.destroy();
-  const { Q, H, selected_idx, p, qIdx } = res;
+  const { Q, H, selected_idx, p, qIdx, V_selected, H_selected } = res;
 
-  const Qfull = linspace(0, Math.max(80, Q_req*1.5), 200);
+  const Qfull = linspace(0, Math.max(80, Q_req*1.5), 400);
   const Hfull = Qfull.map(q => { const v = poly2(H_coeffs[selected_idx], q); return v > 0 ? v : null; });
 
-  const winQ = Q.slice(p, qIdx+1);
-  const winH = winQ.map(q => poly2(H_coeffs[selected_idx], q));
-
   hqChartInst = new Chart(ctx, {
-  type: 'line',
-  data: {
-    labels: Qfull.map(q => q.toFixed(1)),
-    datasets: [
-      { label:'H-Q Curve', data: Hfull, borderColor:'#4af0b4', borderWidth:2,
-        pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(74,240,180,0.06)' },
-      { label:'Required Q', data: Qfull.map((q,i) => Math.abs(parseFloat(Qfull[i]) - Q_req) < (Qfull[1]-Qfull[0])*0.6 ? Hfull[i] ?? 0 : null),
-        borderColor:'#f59e0b', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
-      { label:'Selected Q', data: Qfull.map((q,i) => Math.abs(parseFloat(Qfull[i]) - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? Hfull[i] ?? 0 : null),
-        borderColor:'#f87171', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
-      { label:'Selected point', data: Qfull.map(q => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? res.H_selected : null),
-        borderColor:'#f87171', borderWidth:0, pointRadius:6, pointBackgroundColor:'#f87171', fill:false }
-    ]
-  },
-  options: {
-    responsive:true, maintainAspectRatio:false,
-    plugins:{
-      legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12 } },
-      tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
+    type: 'line',
+    data: {
+      labels: Qfull.map(q => q.toFixed(2)),
+      datasets: [
+        { label:'H-Q Curve', data: Hfull, borderColor:'#4af0b4', borderWidth:2,
+          pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(74,240,180,0.06)', order:3 },
+        vlineDataset(Qfull, Q_req,       Hfull, '#f59e0b', 'Required Q'),
+        vlineDataset(Qfull, V_selected,  Hfull, '#f87171', 'Selected Q'),
+        dotDataset  (Qfull, V_selected,  H_selected, '#f87171', 'Operating point')
+      ]
     },
-    scales:{
-      x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
-          grid:{color:'rgba(255,255,255,0.05)'} },
-      y:{ title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
-          grid:{color:'rgba(255,255,255,0.05)'} }
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12, padding:12 } },
+        tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
+      },
+      scales:{
+        x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
+            grid:{color:'rgba(255,255,255,0.05)'} },
+        y:{ title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
+            grid:{color:'rgba(255,255,255,0.05)'} }
+      }
     }
-  }
-});
+  });
 }
 
 function drawEta(res, Q_req) {
   const ctx = document.getElementById('etaChart').getContext('2d');
   if (etaChartInst) etaChartInst.destroy();
-  const { selected_idx, num_stages, p, Q, qIdx } = res;
+  const { selected_idx, num_stages, V_selected, eta_max } = res;
 
-  const Qfull = linspace(0, Math.max(80, Q_req*1.5), 200);
-  const EtaRaw = Qfull.map(q => poly2(eta_coeffs[selected_idx], q));
-  const EtaTotal = EtaRaw.map(e => Math.pow(0.9, num_stages-1) * e);
-  const EtaVals  = EtaTotal.map(e => e > 0 ? parseFloat((e*100).toFixed(2)) : null);
-
-  const winQ = Q.slice(p, qIdx+1);
+  const Qfull   = linspace(0, Math.max(80, Q_req*1.5), 400);
+  const EtaRaw  = Qfull.map(q => poly2(eta_coeffs[selected_idx], q));
+  const EtaVals = EtaRaw.map(e => { const v = Math.pow(0.9, num_stages-1)*e*100; return v > 0 ? parseFloat(v.toFixed(2)) : null; });
 
   etaChartInst = new Chart(ctx, {
-  type:'line',
-  data:{
-    labels: Qfull.map(q => q.toFixed(1)),
-    datasets:[
-      { label:'η Total', data:EtaVals, borderColor:'#60a5fa', borderWidth:2,
-        pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(96,165,250,0.06)' },
-      { label:'Required Q', data: Qfull.map((q,i) => Math.abs(q - Q_req) < (Qfull[1]-Qfull[0])*0.6 ? EtaVals[i] ?? 0 : null),
-        borderColor:'#f59e0b', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
-      { label:'Selected Q', data: Qfull.map((q,i) => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? EtaVals[i] ?? 0 : null),
-        borderColor:'#f87171', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
-      { label:'Selected point', data: Qfull.map(q => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? (res.eta_max*100) : null),
-        borderColor:'#f87171', borderWidth:0, pointRadius:6, pointBackgroundColor:'#f87171', fill:false }
-    ]
-  },
-  options:{
-    responsive:true, maintainAspectRatio:false,
-    plugins:{
-      legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12 } },
-      tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
+    type:'line',
+    data:{
+      labels: Qfull.map(q => q.toFixed(2)),
+      datasets:[
+        { label:'\u03b7 Total', data:EtaVals, borderColor:'#60a5fa', borderWidth:2,
+          pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(96,165,250,0.06)', order:3 },
+        vlineDataset(Qfull, Q_req,      EtaVals, '#f59e0b', 'Required Q'),
+        vlineDataset(Qfull, V_selected, EtaVals, '#f87171', 'Selected Q'),
+        dotDataset  (Qfull, V_selected, eta_max*100, '#f87171', 'Operating point')
+      ]
     },
-    scales:{
-      x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
-          grid:{color:'rgba(255,255,255,0.05)'} },
-      y:{ title:{display:true,text:'η total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
-          grid:{color:'rgba(255,255,255,0.05)'} }
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12, padding:12 } },
+        tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
+      },
+      scales:{
+        x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
+            grid:{color:'rgba(255,255,255,0.05)'} },
+        y:{ title:{display:true,text:'\u03b7 total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
+            grid:{color:'rgba(255,255,255,0.05)'} }
+      }
     }
-  }
-});
+  });
 }
 
 function calcNs(rpm, Q, H) { return rpm * Math.pow((Q/1000), 0.5) / Math.pow(H, 0.75); }
@@ -522,13 +523,13 @@ function runSelection() {
   const note = document.getElementById('algoNote');
   note.style.display = 'block';
   note.innerHTML = num_stages > 1
-    ? `Multistage config: <span>${num_stages} stages in series</span> — \u03b7 degradation applied: \u03b7_total = 0.9^(${num_stages}-1) \u00d7 \u03b7(Q) = <span>${(eta_max*100).toFixed(1)}%</span>. Q window scanned: ${Q_req.toFixed(2)} \u2192 ${(1.05*Q_req).toFixed(2)} l/s.`
-    : `Single stage selected. Q window scanned: ${Q_req.toFixed(2)} \u2192 ${(1.05*Q_req).toFixed(2)} l/s. Head satisfied across full window.`;
+    ? `Multistage config: <span>${num_stages} stages in series</span> &mdash; &eta; degradation applied: &eta;_total = 0.9^(${num_stages}-1) &times; &eta;(Q) = <span>${(eta_max*100).toFixed(1)}%</span>. Q window scanned: ${Q_req.toFixed(2)} &rarr; ${(1.05*Q_req).toFixed(2)} l/s.`
+    : `Single stage selected. Q window scanned: ${Q_req.toFixed(2)} &rarr; ${(1.05*Q_req).toFixed(2)} l/s. Head satisfied across full window.`;
 
   document.getElementById('metricsGrid').innerHTML = `
     <div class="metric highlight"><div class="metric-label">Flow Rate</div><div class="metric-value">${V_selected.toFixed(2)}</div><div class="metric-unit">l/s (operating)</div></div>
-    <div class="metric highlight"><div class="metric-label">Total Head</div><div class="metric-value">${H_total.toFixed(2)}</div><div class="metric-unit">m (${num_stages} \u00d7 ${H_selected.toFixed(2)})</div></div>
-    <div class="metric"><div class="metric-label">Efficiency <span style="font-family:serif">η</span></div><div class="metric-value">${(eta_max*100).toFixed(1)}<span style="font-size:14px">%</span></div><div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" style="width:${(eta_max*100).toFixed(1)}%"></div></div></div>
+    <div class="metric highlight"><div class="metric-label">Total Head</div><div class="metric-value">${H_total.toFixed(2)}</div><div class="metric-unit">m (${num_stages} &times; ${H_selected.toFixed(2)})</div></div>
+    <div class="metric"><div class="metric-label">Efficiency <span style="font-family:serif">&#951;</span></div><div class="metric-value">${(eta_max*100).toFixed(1)}<span style="font-size:14px">%</span></div><div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" style="width:${Math.min((eta_max*100),100).toFixed(1)}%"></div></div></div>
     <div class="metric"><div class="metric-label">Speed</div><div class="metric-value">${RPM_selected}</div><div class="metric-unit">RPM</div></div>
     <div class="metric"><div class="metric-label">Stages</div><div class="metric-value">${num_stages}</div><div class="metric-unit">in series</div></div>
     <div class="metric"><div class="metric-label">Specific Speed N&#x209B;</div><div class="metric-value">${Ns.toFixed(1)}</div><div class="metric-unit"><span class="ns-badge ${ns.cls}">${ns.label}</span></div></div>
@@ -539,9 +540,9 @@ function runSelection() {
   document.getElementById('compareBody').innerHTML = `
     <tr><td class="label">Flow rate (l/s)</td><td>${Q_req.toFixed(2)}</td><td class="match">${V_selected.toFixed(2)}</td><td style="color:var(--accent)">${qDev > 0?'+':''}${qDev}%</td></tr>
     <tr><td class="label">Total head (m)</td><td>${H_req.toFixed(2)}</td><td class="match">${H_total.toFixed(2)}</td><td style="color:${Math.abs(hDev)>10?'var(--warn)':'var(--accent)'}">${hDev > 0?'+':''}${hDev}%</td></tr>
-    <tr><td class="label">Head per stage (m)</td><td>&#8212;</td><td>${H_selected.toFixed(2)}</td><td>&#8212;</td></tr>
-    <tr><td class="label">Efficiency <span style="font-family:serif">η</span>_total</td><td>${(eta_max*100).toFixed(2)}%</td><td>&#8212;</td></tr>
-    <tr><td class="label">Number of stages</td><td>&#8212;</td><td>${num_stages}</td><td>&#8212;</td></tr>
+    <tr><td class="label">Head per stage (m)</td><td>&mdash;</td><td>${H_selected.toFixed(2)}</td><td>&mdash;</td></tr>
+    <tr><td class="label">Efficiency <span style="font-family:serif">&#951;</span>_total</td><td>&mdash;</td><td class="match">${(eta_max*100).toFixed(2)}%</td><td>&mdash;</td></tr>
+    <tr><td class="label">Number of stages</td><td>&mdash;</td><td>${num_stages}</td><td>&mdash;</td></tr>
   `;
 
   drawHQ(res, Q_req);
@@ -556,11 +557,11 @@ function runSelection() {
     const isSel = p2 === selected_idx;
     return `<div class="pump-row ${isSel?'selected':''}">
       <span class="pump-id">P${p2+1}</span>
-      <span class="pump-name">${pumpNames[p2]}${isSel?' \u2713':''}</span>
-      <span class="pump-val ${valid?'ok':'fail'}">${H_tot?H_tot.toFixed(1):'&#8212;'}</span>
-      <span class="pump-val ${valid?'ok':'fail'}">${e>0?(e*100).toFixed(1):'&#8212;'}</span>
+      <span class="pump-name">${pumpNames[p2]}${isSel?' &#10003;':''}</span>
+      <span class="pump-val ${valid?'ok':'fail'}">${H_tot?H_tot.toFixed(1):'&mdash;'}</span>
+      <span class="pump-val ${valid?'ok':'fail'}">${e>0?(e*100).toFixed(1):'&mdash;'}</span>
       <span class="pump-val">${Pump_RPMs[p2]}</span>
-      <span class="pump-val ${valid?'':'fail'}">${stages_needed||'&#8212;'}</span>
+      <span class="pump-val ${valid?'':'fail'}">${stages_needed||'&mdash;'}</span>
     </div>`;
   }).join('');
 
