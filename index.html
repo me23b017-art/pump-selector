@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pump Selection Tool</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14; --surface: #141720; --surface2: #1c2030;
+    --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.15);
+    --text: #e8eaf2; --muted: #7a7f96;
+    --accent: #4af0b4; --accent2: #2dd4bf;
+    --accent-dim: rgba(74,240,180,0.12); --accent-glow: rgba(74,240,180,0.06);
+    --warn: #f59e0b; --error: #f87171; --blue: #60a5fa;
+    --font-head: 'Syne', sans-serif; --font-mono: 'DM Mono', monospace;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); min-height: 100vh; }
+  .header {
+    padding: 2.5rem 2rem 2rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(74,240,180,0.04) 0%, transparent 100%);
+  }
+  .header-tag { font-size: 11px; color: var(--accent); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .header h1 { font-family: var(--font-head); font-size: clamp(1.6rem,4vw,2.4rem); font-weight: 700; color: #fff; line-height: 1.1; }
+  .header h1 span { color: var(--accent); }
+  .main { display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 130px); }
+  @media(max-width:800px){ .main { grid-template-columns: 1fr; } }
+  .sidebar { padding: 2rem; border-right: 1px solid var(--border); background: var(--surface); }
+  .section-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.2rem; }
+  .field { margin-bottom: 1.4rem; }
+  .field label { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); margin-bottom: 0.5rem; }
+  .field label .unit { font-size: 11px; color: var(--accent); opacity: 0.7; }
+  .field input[type="number"] {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 0.65rem 0.9rem; color: var(--text);
+    font-family: var(--font-mono); font-size: 15px; outline: none; transition: border-color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .field input[type="number"]::-webkit-outer-spin-button,
+  .field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .field input[type="number"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .field input[type="range"] { width: 100%; accent-color: var(--accent); height: 4px; margin-top: 0.4rem; }
+  .range-row { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 0.3rem; }
+  .run-btn {
+    width: 100%; background: var(--accent); color: #000; border: none; border-radius: 6px;
+    padding: 0.85rem; font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+    letter-spacing: 0.08em; cursor: pointer; margin-top: 0.5rem;
+    transition: opacity 0.15s, transform 0.1s; text-transform: uppercase;
+  }
+  .run-btn:hover { opacity: 0.88; }
+  .run-btn:active { transform: scale(0.98); }
+  .pump-db { margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+  .db-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 10px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .db-row.head { color: var(--text); letter-spacing: 0.1em; text-transform: uppercase; }
+  .db-row span { text-align: right; }
+  .db-row span:first-child { text-align: left; }
+  .content { padding: 2rem; background: var(--bg); }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; min-height: 300px; color: var(--muted); text-align: center; }
+  .empty-icon { font-size: 48px; margin-bottom: 1rem; opacity: 0.3; }
+  .results { display: none; }
+  .results.visible { display: block; }
+  .result-header { display: flex; align-items: center; gap: 12px; margin-bottom: 1.5rem; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); flex-shrink: 0; }
+  .status-dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+  .status-dot.err  { background: var(--error); box-shadow: 0 0 8px var(--error); }
+  .result-header h2 { font-family: var(--font-head); font-size: 16px; font-weight: 600; color: #fff; }
+  .result-header .ts { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .metric.highlight { border-color: rgba(74,240,180,0.3); background: var(--accent-glow); }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 0.4rem; }
+  .metric-value { font-size: 22px; font-weight: 500; color: var(--text); font-family: var(--font-mono); line-height: 1; }
+  .metric.highlight .metric-value { color: var(--accent); }
+  .metric-unit { font-size: 12px; color: var(--muted); margin-top: 0.2rem; }
+  .compare-table { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem; }
+  .compare-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .compare-table th { background: var(--surface2); padding: 0.65rem 1rem; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); font-weight: 400; }
+  .compare-table td { padding: 0.65rem 1rem; border-top: 1px solid var(--border); color: var(--text); }
+  .compare-table td.match { color: var(--accent); font-weight: 500; }
+  .compare-table td.label { color: var(--muted); font-size: 12px; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 1.5rem; }
+  @media(max-width:900px){ .charts-row { grid-template-columns: 1fr; } }
+  .chart-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; }
+  .chart-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 1rem; }
+  .chart-wrap { position: relative; width: 100%; aspect-ratio: 1 / 1; }
+  .ns-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500; margin-top: 0.8rem; }
+  .ns-badge.radial { background: rgba(74,240,180,0.15); color: var(--accent); }
+  .ns-badge.mixed  { background: rgba(96,165,250,0.15); color: var(--blue); }
+  .ns-badge.axial  { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .all-pumps { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .all-pumps-header { background: var(--surface2); padding: 0.65rem 1rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+  .pump-row { display: grid; grid-template-columns: 40px 1fr 80px 80px 80px 80px; gap: 8px; padding: 0.6rem 1rem; border-top: 1px solid var(--border); font-size: 12px; align-items: center; transition: background 0.15s; }
+  .pump-row:hover { background: var(--surface2); }
+  .pump-row.selected { background: var(--accent-dim); border-left: 2px solid var(--accent); }
+  .pump-row.header-row { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); background: var(--surface2); border-top: none; }
+  .pump-id { font-size: 11px; color: var(--muted); }
+  .pump-name { color: var(--text); }
+  .pump-val { text-align: right; color: var(--muted); }
+  .pump-val.ok   { color: var(--accent); }
+  .pump-val.fail { color: var(--error); opacity: 0.5; }
+  .bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+  .bar-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.6s ease; }
+  .err-box { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); border-radius: 8px; padding: 1rem; font-size: 13px; color: var(--error); margin-bottom: 1rem; }
+  .runtime { font-size: 11px; color: var(--muted); margin-top: 1rem; text-align: right; }
+  .algo-note { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem 1rem; font-size: 11px; color: var(--muted); margin-bottom: 1.5rem; line-height: 1.6; }
+  .algo-note span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-tag">&#x25B6; Centrifugal Pump Selector</div>
+  <h1>Pump <span>Selection</span> Tool</h1>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="section-label">// Input Parameters</div>
+    <div class="field">
+      <label>Required Head <span class="unit">metres (m)</span></label>
+      <input type="number" id="H_req" value="50" min="1" max="500" step="0.5">
+      <input type="range" id="H_slider" min="5" max="300" value="50" step="1">
+      <div class="range-row"><span>5 m</span><span>300 m</span></div>
+    </div>
+    <div class="field">
+      <label>Required Flow Rate <span class="unit">litres/sec (l/s)</span></label>
+      <input type="number" id="Q_req" value="20" min="0.1" max="100" step="0.5">
+      <input type="range" id="Q_slider" min="1" max="100" value="20" step="0.5">
+      <div class="range-row"><span>1 l/s</span><span>100 l/s</span></div>
+    </div>
+    <button class="run-btn" onclick="runSelection()">&#x25B6; Run Selection</button>
+
+    <div class="pump-db">
+      <div class="section-label">// Pump Database (10 pumps)</div>
+      <div class="db-row head"><span>Pump</span><span>H&#8320; (m)</span><span>RPM</span></div>
+      <div id="dbList"></div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">&#9881;</div>
+      <p>Set parameters and click <strong>Run Selection</strong></p>
+      <p style="margin-top:0.5rem;font-size:11px;">Algorithm: Q-window scan, multistage series (up to 5)</p>
+    </div>
+
+    <div class="results" id="results">
+      <div class="result-header">
+        <div class="status-dot" id="statusDot"></div>
+        <h2 id="resultTitle">Selection Complete</h2>
+        <span class="ts" id="resultTs"></span>
+      </div>
+
+      <div id="errBox" class="err-box" style="display:none;"></div>
+      <div class="algo-note" id="algoNote" style="display:none;"></div>
+
+      <div class="metrics-grid" id="metricsGrid"></div>
+
+      <div class="compare-table">
+        <table>
+          <thead><tr><th>Parameter</th><th>Required</th><th>Selected</th><th>Deviation</th></tr></thead>
+          <tbody id="compareBody"></tbody>
+        </table>
+      </div>
+
+      <div class="charts-row">
+        <div class="chart-section">
+          <div class="chart-title">// H-Q Curve &#8212; Selected Pump (per stage)</div>
+          <div class="chart-wrap"><canvas id="hqChart"></canvas></div>
+        </div>
+        <div class="chart-section">
+          <div class="chart-title">// Efficiency Curve &#8212; Selected Pump</div>
+          <div class="chart-wrap"><canvas id="etaChart"></canvas></div>
+        </div>
+      </div>
+
+      <div class="all-pumps">
+        <div class="all-pumps-header">// All Pumps Evaluated</div>
+        <div class="pump-row header-row">
+          <span>#</span><span>Model</span>
+          <span style="text-align:right">H tot (m)</span>
+          <span style="text-align:right">&eta; (%)</span>
+          <span style="text-align:right">RPM</span>
+          <span style="text-align:right">Stages</span>
+        </div>
+        <div id="allPumpsBody"></div>
+      </div>
+      <div class="runtime" id="runtimeText"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/3.0.1/chartjs-plugin-annotation.min.js"></script>
+<script>
+const H_coeffs = [
+  [-0.0050,-0.1500,55.0],[-0.0040,-0.1200,48.0],[-0.0060,-0.1800,62.0],
+  [-0.0035,-0.1000,42.0],[-0.0045,-0.1300,50.0],[-0.0072,-0.2100,78.0],
+  [-0.0028,-0.0700,30.0],[-0.0090,-0.2500,95.0],[-0.0055,-0.1650,68.0],
+  [-0.0018,-0.0450,20.0]
+];
+const eta_coeffs = [
+  [-0.00020,0.01680,0.3672],[-0.00018,0.01692,0.3822],[-0.00021,0.02226,0.1611],
+  [-0.00016,0.01824,0.1304],[-0.00019,0.02280,0.0160],[-0.00025,0.02800,0.0500],
+  [-0.00013,0.01350,0.2900],[-0.00030,0.03100,-0.1500],[-0.00022,0.02500,0.1200],
+  [-0.00010,0.01050,0.3500]
+];
+const Pump_RPMs = [2850,2900,2850,1450,1750,3200,1200,3500,2200,960];
+const pumpNames = [
+  'Model A-2850','Model B-2900','Model C-2850','Model D-1450','Model E-1750',
+  'Model F-3200','Model G-1200','Model H-3500','Model I-2200','Model J-960'
+];
+
+let hqChartInst = null, etaChartInst = null;
+
+function linspace(a, b, n) {
+  const arr = [];
+  const step = (b - a) / (n - 1);
+  for (let i = 0; i < n; i++) arr.push(a + i * step);
+  return arr;
+}
+
+// Shared chart config builder
+function makeChartBase(Qfull, mainData, opQ, opY, yLabel, mainColor, yUnit) {
+  const xMax = Qfull[Qfull.length - 1];
+  const yVals = mainData.filter(v => v !== null);
+  const yMax  = Math.max(...yVals) * 1.15;
+
+  return {
+    type: 'line',
+    data: {
+      labels: Qfull,
+      datasets: [
+        {
+          label: yLabel,
+          data: mainData,
+          borderColor: mainColor,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.35,
+          fill: true,
+          backgroundColor: mainColor + '14',
+          order: 3
+        },
+        // Operating point dot
+        {
+          label: 'Operating Point',
+          data: Qfull.map(q => Math.abs(q - opQ) < (xMax / 400) * 1.5 ? opY : null),
+          borderColor: '#f87171',
+          backgroundColor: '#f87171',
+          pointRadius: 7,
+          pointHoverRadius: 9,
+          pointStyle: 'circle',
+          borderWidth: 2,
+          fill: false,
+          order: 1,
+          spanGaps: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 1,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#7a7f96', font: { family: 'DM Mono', size: 10 }, boxWidth: 10, padding: 12 }
+        },
+        tooltip: {
+          callbacks: {
+            title: items => `Q = ${parseFloat(items[0].label).toFixed(2)} l/s`,
+            label: item => `${item.dataset.label}: ${item.parsed.y !== null ? item.parsed.y.toFixed(2) : ''} ${yUnit}`
+          }
+        },
+        annotation: {
+          annotations: {
+            // Vertical drop line from operating point to x-axis
+            vline: {
+              type: 'line',
+              xMin: opQ, xMax: opQ,
+              yMin: 0,   yMax: opY,
+              borderColor: '#f87171',
+              borderWidth: 1.5,
+              borderDash: [6, 4]
+            },
+            // Horizontal drop line from operating point to y-axis
+            hline: {
+              type: 'line',
+              xMin: 0,   xMax: opQ,
+              yMin: opY, yMax: opY,
+              borderColor: '#f87171',
+              borderWidth: 1.5,
+              borderDash: [6, 4]
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: xMax,
+          title: { display: true, text: 'Flow Rate Q (l/s)', color: '#7a7f96', font: { family: 'DM Mono', size: 11 } },
+          ticks: { color: '#7a7f96', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8,
+                   callback: v => v.toFixed(0) },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        },
+        y: {
+          min: 0,
+          max: yMax,
+          title: { display: true, text: yLabel + ' (' + yUnit + ')', color: '#7a7f96', font: { family: 'DM Mono', size: 11 } },
+          ticks: { color: '#7a7f96', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 8 },
+          grid: { color: 'rgba(255,255,255,0.05)' }
+        }
+      }
+    }
+  };
+}
+
+function poly2(coeffs, Q) { return coeffs[0]*Q*Q + coeffs[1]*Q + coeffs[2]; }
+
+function pump_selector(V_in, H_in) {
+  const NUM_PTS    = 500;
+  const MAX_STAGES = 5;
+  const num_pumps  = H_coeffs.length;
+
+  const V_cutoff = 1.05 * V_in;
+  const Q = linspace(V_in, V_cutoff, NUM_PTS);
+
+  const H   = [];
+  const eta = [];
+  for (let l = 0; l < num_pumps; l++) {
+    H.push(Q.map(q => poly2(H_coeffs[l], q)));
+    eta.push(Q.map(q => poly2(eta_coeffs[l], q)));
+  }
+
+  let p = 0, minDp = Infinity;
+  for (let i = 0; i < NUM_PTS; i++) { const d = Math.abs(Q[i]-V_in);    if (d<minDp){minDp=d; p=i;} }
+  let qIdx = 0, minDq = Infinity;
+  for (let i = 0; i < NUM_PTS; i++) { const d = Math.abs(Q[i]-V_cutoff); if (d<minDq){minDq=d; qIdx=i;} }
+  const max_window = qIdx - p + 1;
+
+  // Step 4: full-window max eta
+  const eta_f       = new Array(num_pumps).fill(0);
+  const viable_mask = new Array(num_pumps).fill(false);
+  for (let l = 0; l < num_pumps; l++) {
+    eta_f[l] = Math.max(...eta[l].slice(p, qIdx+1));
+    viable_mask[l] = (MAX_STAGES * Math.max(H[l][p], H[l][qIdx])) > H_in;
+  }
+
+  const sort_idx     = Array.from({length: num_pumps}, (_,i)=>i).sort((a,b) => eta_f[b] - eta_f[a]);
+  const viable_sorted = sort_idx.filter(i => viable_mask[i]);
+  const num_viable    = viable_sorted.length;
+
+  if (num_viable === 0) {
+    return { found:false, msg:`No pump can meet ${H_in} m even at ${MAX_STAGES} stages.` };
+  }
+
+  // Step 5: precompute flag1 / eta_stages by viable rank
+  const flag1      = Array.from({length: num_viable}, () => new Array(MAX_STAGES).fill(0));
+  const eta_stages = Array.from({length: num_viable}, () => new Array(MAX_STAGES).fill(0));
+  for (let b = 0; b < num_viable; b++) {
+    const pump_b = viable_sorted[b];
+    const H_rep  = Math.max(H[pump_b][p], H[pump_b][qIdx]);
+    for (let c = 0; c < MAX_STAGES; c++) {
+      if ((c+1) * H_rep > H_in) {
+        flag1[b][c] = 1;
+        eta_stages[b][c] = Math.pow(0.9, c) * Math.max(...eta[pump_b].slice(p, qIdx+1));
+      }
+    }
+  }
+
+  let H_new   = new Array(max_window).fill(0);
+  let eta_new = new Array(max_window).fill(0);
+  let j = 0, selected_idx = 0, num_stages = 1, found = false;
+
+  for (let k = 0; k < num_viable; k++) {
+    const pump_idx = viable_sorted[k];
+    j = 0;
+
+    // Single stage
+    for (let i = p; i <= qIdx; i++) {
+      if (H[pump_idx][i] > H_in) { H_new[j] = H[pump_idx][i]; eta_new[j] = eta[pump_idx][i]; j++; }
+      else break;
+    }
+    if (j === max_window) { selected_idx = pump_idx; num_stages = 1; found = true; break; }
+
+    // Multistage
+    for (let a = 2; a <= MAX_STAGES; a++) {
+      const H_rep_k      = Math.max(H[pump_idx][p], H[pump_idx][qIdx]);
+      const H_multistage = a * H_rep_k;
+      const eta_ms       = Math.pow(0.9, a-1) * Math.max(...eta[pump_idx].slice(p, qIdx+1));
+      if (H_multistage <= H_in) continue;
+
+      let best_alt_eta = 0, best_alt_rank = k, best_alt_stage = a;
+      for (let e = k+1; e < num_viable; e++) {
+        for (let f = 0; f < MAX_STAGES; f++) {
+          if (flag1[e][f] === 1 && eta_stages[e][f] > best_alt_eta) {
+            best_alt_eta = eta_stages[e][f]; best_alt_rank = e; best_alt_stage = f+1;
+          }
+        }
+      }
+
+      let use_current = H_multistage < 1.2*H_in ? (eta_ms >= best_alt_eta) : (best_alt_eta < 0.9*eta_ms);
+      const pump_sel  = use_current ? pump_idx            : viable_sorted[best_alt_rank];
+      const stage_sel = use_current ? a                   : best_alt_stage;
+
+      j = 0;
+      for (let i = p; i <= qIdx; i++) {
+        H_new[j] = H[pump_sel][i];
+        eta_new[j] = Math.pow(0.9, stage_sel-1) * eta[pump_sel][i];
+        j++;
+      }
+      selected_idx = pump_sel; num_stages = stage_sel; found = true; break;
+    }
+    if (found) break;
+  }
+
+  if (found && j > 0) {
+    const H_filled = H_new.slice(0,j), eta_filled = eta_new.slice(0,j);
+    let eta_max_val = -Infinity, r = 0;
+    for (let i = 0; i < j; i++) if (eta_filled[i] > eta_max_val) { eta_max_val = eta_filled[i]; r = i; }
+    return {
+      V_selected: Q[p+r], H_selected: H_filled[r], eta_max: eta_max_val,
+      RPM_selected: Pump_RPMs[selected_idx], num_stages, selected_idx,
+      found: true, Q, H, eta, p, qIdx
+    };
+  }
+  return { found:false, msg:'No valid pump or multistage configuration found.' };
+}
+
+
+
+function drawHQ(res, Q_req) {
+  const ctx = document.getElementById('hqChart').getContext('2d');
+  if (hqChartInst) hqChartInst.destroy();
+  const { selected_idx, V_selected, H_selected } = res;
+
+  const qMax  = Math.max(80, Q_req * 1.6);
+  const Qfull = linspace(0, qMax, 300);
+  const Hfull = Qfull.map(q => { const v = poly2(H_coeffs[selected_idx], q); return v > 0 ? parseFloat(v.toFixed(3)) : null; });
+
+  const cfg = makeChartBase(Qfull, Hfull, V_selected, H_selected, 'Head / stage', '#4af0b4', 'm');
+
+  // Override annotation labels
+  cfg.options.plugins.annotation.annotations.vline.label = {
+    display: true,
+    content: `Q = ${V_selected.toFixed(2)} l/s`,
+    position: 'end',
+    yAdjust: -10,
+    color: '#f87171',
+    font: { family: 'DM Mono', size: 9 },
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 4,
+    borderRadius: 3
+  };
+  cfg.options.plugins.annotation.annotations.hline.label = {
+    display: true,
+    content: `H = ${H_selected.toFixed(2)} m`,
+    position: 'start',
+    xAdjust: 6,
+    color: '#f87171',
+    font: { family: 'DM Mono', size: 9 },
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 4,
+    borderRadius: 3
+  };
+
+  hqChartInst = new Chart(ctx, cfg);
+}
+
+function drawEta(res, Q_req) {
+  const ctx = document.getElementById('etaChart').getContext('2d');
+  if (etaChartInst) etaChartInst.destroy();
+  const { selected_idx, num_stages, V_selected, eta_max } = res;
+
+  const qMax    = Math.max(80, Q_req * 1.6);
+  const Qfull   = linspace(0, qMax, 300);
+  const EtaVals = Qfull.map(q => {
+    const v = Math.pow(0.9, num_stages - 1) * poly2(eta_coeffs[selected_idx], q) * 100;
+    return v > 0 ? parseFloat(v.toFixed(3)) : null;
+  });
+
+  const opEta = parseFloat((eta_max * 100).toFixed(2));
+  const cfg   = makeChartBase(Qfull, EtaVals, V_selected, opEta, 'Efficiency η', '#60a5fa', '%');
+
+  cfg.options.plugins.annotation.annotations.vline.label = {
+    display: true,
+    content: `Q = ${V_selected.toFixed(2)} l/s`,
+    position: 'end',
+    yAdjust: -10,
+    color: '#f87171',
+    font: { family: 'DM Mono', size: 9 },
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 4,
+    borderRadius: 3
+  };
+  cfg.options.plugins.annotation.annotations.hline.label = {
+    display: true,
+    content: `η = ${opEta.toFixed(1)}%`,
+    position: 'start',
+    xAdjust: 6,
+    color: '#f87171',
+    font: { family: 'DM Mono', size: 9 },
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 4,
+    borderRadius: 3
+  };
+
+  etaChartInst = new Chart(ctx, cfg);
+}
+
+function calcNs(rpm, Q, H) { return rpm * Math.pow((Q/1000), 0.5) / Math.pow(H, 0.75); }
+function nsType(ns) {
+  if (ns < 50)  return { label:'Radial flow', cls:'radial' };
+  if (ns < 150) return { label:'Mixed flow',  cls:'mixed'  };
+  return              { label:'Axial flow',   cls:'axial'  };
+}
+
+function buildDB() {
+  const el = document.getElementById('dbList');
+  H_coeffs.forEach((c,i) => {
+    el.innerHTML += `<div class="db-row"><span>P${i+1}</span><span>${c[2].toFixed(0)}</span><span>${Pump_RPMs[i]}</span></div>`;
+  });
+}
+
+function syncInputs() {
+  const Hin=document.getElementById('H_req'), Hsl=document.getElementById('H_slider');
+  const Qin=document.getElementById('Q_req'), Qsl=document.getElementById('Q_slider');
+  Hin.addEventListener('input',()=>Hsl.value=Hin.value);
+  Hsl.addEventListener('input',()=>Hin.value=Hsl.value);
+  Qin.addEventListener('input',()=>Qsl.value=Qin.value);
+  Qsl.addEventListener('input',()=>Qin.value=Qsl.value);
+}
+
+function runSelection() {
+  const t0 = performance.now();
+  const H_req = parseFloat(document.getElementById('H_req').value);
+  const Q_req = parseFloat(document.getElementById('Q_req').value);
+
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('errBox').style.display = 'none';
+  document.getElementById('algoNote').style.display = 'none';
+
+  if (isNaN(H_req)||isNaN(Q_req)||H_req<=0||Q_req<=0) {
+    document.getElementById('errBox').style.display='block';
+    document.getElementById('errBox').textContent='Error: Please enter valid positive values.';
+    return;
+  }
+
+  const res = pump_selector(Q_req, H_req);
+
+  if (!res.found) {
+    document.getElementById('statusDot').className='status-dot err';
+    document.getElementById('resultTitle').textContent='No suitable pump found';
+    document.getElementById('errBox').style.display='block';
+    document.getElementById('errBox').textContent = res.msg || 'No pump meets the requirements.';
+    document.getElementById('metricsGrid').innerHTML='';
+    document.getElementById('compareBody').innerHTML='';
+    document.getElementById('allPumpsBody').innerHTML='';
+    return;
+  }
+
+  const { V_selected, H_selected, eta_max, RPM_selected, num_stages, selected_idx } = res;
+  const H_total = H_selected * num_stages;
+  const Ns = calcNs(RPM_selected, V_selected, H_selected);
+  const ns = nsType(Ns);
+
+  document.getElementById('statusDot').className = 'status-dot';
+  document.getElementById('resultTitle').textContent = `Selected: ${pumpNames[selected_idx]}`;
+  document.getElementById('resultTs').textContent = new Date().toLocaleTimeString();
+
+  const note = document.getElementById('algoNote');
+  note.style.display = 'block';
+  note.innerHTML = num_stages > 1
+    ? `Multistage config: <span>${num_stages} stages in series</span> &mdash; &eta; degradation applied: &eta;_total = 0.9^(${num_stages}-1) &times; &eta;(Q) = <span>${(eta_max*100).toFixed(1)}%</span>. Q window scanned: ${Q_req.toFixed(2)} &rarr; ${(1.05*Q_req).toFixed(2)} l/s.`
+    : `Single stage selected. Q window scanned: ${Q_req.toFixed(2)} &rarr; ${(1.05*Q_req).toFixed(2)} l/s. Head satisfied across full window.`;
+
+  document.getElementById('metricsGrid').innerHTML = `
+    <div class="metric highlight"><div class="metric-label">Flow Rate</div><div class="metric-value">${V_selected.toFixed(2)}</div><div class="metric-unit">l/s (operating)</div></div>
+    <div class="metric highlight"><div class="metric-label">Total Head</div><div class="metric-value">${H_total.toFixed(2)}</div><div class="metric-unit">m (${num_stages} &times; ${H_selected.toFixed(2)})</div></div>
+    <div class="metric"><div class="metric-label">Efficiency &eta;</div><div class="metric-value">${(eta_max*100).toFixed(1)}<span style="font-size:14px">%</span></div><div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" style="width:${Math.min((eta_max*100),100).toFixed(1)}%"></div></div></div>
+    <div class="metric"><div class="metric-label">Speed</div><div class="metric-value">${RPM_selected}</div><div class="metric-unit">RPM</div></div>
+    <div class="metric"><div class="metric-label">Stages</div><div class="metric-value">${num_stages}</div><div class="metric-unit">in series</div></div>
+    <div class="metric"><div class="metric-label">Specific Speed N&#x209B;</div><div class="metric-value">${Ns.toFixed(1)}</div><div class="metric-unit"><span class="ns-badge ${ns.cls}">${ns.label}</span></div></div>
+  `;
+
+  const hDev = ((H_total - H_req) / H_req * 100).toFixed(1);
+  const qDev = ((V_selected - Q_req) / Q_req * 100).toFixed(1);
+  document.getElementById('compareBody').innerHTML = `
+    <tr><td class="label">Flow rate (l/s)</td><td>${Q_req.toFixed(2)}</td><td class="match">${V_selected.toFixed(2)}</td><td style="color:var(--accent)">${qDev > 0?'+':''}${qDev}%</td></tr>
+    <tr><td class="label">Total head (m)</td><td>${H_req.toFixed(2)}</td><td class="match">${H_total.toFixed(2)}</td><td style="color:${Math.abs(hDev)>10?'var(--warn)':'var(--accent)'}">${hDev > 0?'+':''}${hDev}%</td></tr>
+    <tr><td class="label">Head per stage (m)</td><td>&mdash;</td><td>${H_selected.toFixed(2)}</td><td>&mdash;</td></tr>
+    <tr><td class="label">Efficiency &eta;_total</td><td>&mdash;</td><td class="match">${(eta_max*100).toFixed(2)}%</td><td>&mdash;</td></tr>
+    <tr><td class="label">Number of stages</td><td>&mdash;</td><td>${num_stages}</td><td>&mdash;</td></tr>
+  `;
+
+  drawHQ(res, Q_req);
+  drawEta(res, Q_req);
+
+  document.getElementById('allPumpsBody').innerHTML = Array.from({length:10},(_,p2) => {
+    const H_s = poly2(H_coeffs[p2], Q_req);
+    const e   = poly2(eta_coeffs[p2], Q_req);
+    const stages_needed = H_s > 0 ? Math.ceil(H_req / H_s) : null;
+    const H_tot = H_s > 0 && stages_needed ? H_s * stages_needed : null;
+    const valid = H_s > 0 && e > 0 && stages_needed && stages_needed <= 5;
+    const isSel = p2 === selected_idx;
+    return `<div class="pump-row ${isSel?'selected':''}">
+      <span class="pump-id">P${p2+1}</span>
+      <span class="pump-name">${pumpNames[p2]}${isSel?' &#10003;':''}</span>
+      <span class="pump-val ${valid?'ok':'fail'}">${H_tot?H_tot.toFixed(1):'&mdash;'}</span>
+      <span class="pump-val ${valid?'ok':'fail'}">${e>0?(e*100).toFixed(1):'&mdash;'}</span>
+      <span class="pump-val">${Pump_RPMs[p2]}</span>
+      <span class="pump-val ${valid?'':'fail'}">${stages_needed||'&mdash;'}</span>
+    </div>`;
+  }).join('');
+
+  const elapsed = ((performance.now()-t0)/1000).toFixed(4);
+  document.getElementById('runtimeText').textContent = `Simulation runtime: ${elapsed} s`;
+}
+
+buildDB();
+syncInputs();
+</script>
+</body>
+</html>
