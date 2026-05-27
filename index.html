@@ -334,29 +334,30 @@ function pump_selector(V_in, H_in) {
 // with yValue at that point — creating a true single-pixel vertical spike.
 function vlineDataset(Qfull, targetQ, yValues, color, label) {
   const step = Qfull[1] - Qfull[0];
-  // find the index closest to targetQ
+  const yMax = Math.max(...yValues.filter(v => v !== null));
+  
+  // Find closest index
   let best = 0, bestD = Infinity;
   for (let i = 0; i < Qfull.length; i++) {
     const d = Math.abs(Qfull[i] - targetQ);
     if (d < bestD) { bestD = d; best = i; }
   }
-  // build a dataset that spans the full y range at that one x index
-  // by setting yMin..yMax we make it look like a vertical line using
-  // a scatter point + an error-bar workaround via two overlapping points.
-  // Simplest reliable approach: use a bar dataset on a secondary axis — 
-  // but easiest with plain Chart.js 4 is to set every point null except
-  // the matching index, then set a large pointRadius so it looks like a line.
-  // Actually the cleanest is to just duplicate the dataset for a tall range.
-  // We'll go with the "fill-to-zero" spike: set the one point to yMax of the chart.
-  const yMax = Math.max(...yValues.filter(v => v !== null));
+
+  // Build data: null everywhere except at `best`, where we set yMax
+  // We use a scatter-style approach: two datasets stacked isn't needed —
+  // instead we force the y-axis min to 0 and set this point to yMax,
+  // then enable fill: { target: 'origin' }
+  const data = Qfull.map((_, i) => i === best ? yMax : null);
+
   return {
     label,
-    data: Qfull.map((_, i) => i === best ? yMax * 1.05 : null),
+    data,
     borderColor: color,
+    backgroundColor: color + '33',
     borderWidth: 2,
     borderDash: [5, 4],
     pointRadius: 0,
-    fill: { target: { value: 0 }, above: color + '22', below: 'transparent' },
+    fill: 'origin',      // fill down to y=0
     tension: 0,
     spanGaps: false,
     order: 2
@@ -412,7 +413,8 @@ function drawHQ(res, Q_req) {
         x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
             ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
             grid:{color:'rgba(255,255,255,0.05)'} },
-        y:{ title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+        y:{ min: 0,
+            title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
             ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
             grid:{color:'rgba(255,255,255,0.05)'} }
       }
@@ -451,7 +453,8 @@ function drawEta(res, Q_req) {
         x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
             ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
             grid:{color:'rgba(255,255,255,0.05)'} },
-        y:{ title:{display:true,text:'\u03b7 total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+        y:{ min: 0,
+            title:{display:true,text:'\u03b7 total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
             ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
             grid:{color:'rgba(255,255,255,0.05)'} }
       }
