@@ -178,7 +178,7 @@
         <div class="pump-row header-row">
           <span>#</span><span>Model</span>
           <span style="text-align:right">H tot (m)</span>
-          <span style="text-align:right">&#951; (%)</span>
+          <span style="text-align:right"><span style="font-family:serif">η</span> (%)</span>
           <span style="text-align:right">RPM</span>
           <span style="text-align:right">Stages</span>
         </div>
@@ -381,32 +381,36 @@ function drawHQ(res, Q_req) {
   const winH = winQ.map(q => poly2(H_coeffs[selected_idx], q));
 
   hqChartInst = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: Qfull.map(q => q.toFixed(1)),
-      datasets: [
-        { label:'H-Q Curve', data: Hfull, borderColor:'#4af0b4', borderWidth:2,
-          pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(74,240,180,0.06)' },
-        { label:'Q window', data: Qfull.map((q,i) => {
-            const inW = q >= winQ[0]-0.1 && q <= winQ[winQ.length-1]+0.1;
-            return inW ? Hfull[i] : null;
-          }), borderColor:'#f59e0b', borderWidth:3, pointRadius:0, tension:0.4,
-          fill:false, spanGaps:false }
-      ]
+  type: 'line',
+  data: {
+    labels: Qfull.map(q => q.toFixed(1)),
+    datasets: [
+      { label:'H-Q Curve', data: Hfull, borderColor:'#4af0b4', borderWidth:2,
+        pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(74,240,180,0.06)' },
+      { label:'Required Q', data: Qfull.map((q,i) => Math.abs(parseFloat(Qfull[i]) - Q_req) < (Qfull[1]-Qfull[0])*0.6 ? Hfull[i] ?? 0 : null),
+        borderColor:'#f59e0b', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
+      { label:'Selected Q', data: Qfull.map((q,i) => Math.abs(parseFloat(Qfull[i]) - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? Hfull[i] ?? 0 : null),
+        borderColor:'#f87171', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
+      { label:'Selected point', data: Qfull.map(q => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? res.H_selected : null),
+        borderColor:'#f87171', borderWidth:0, pointRadius:6, pointBackgroundColor:'#f87171', fill:false }
+    ]
+  },
+  options: {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12 } },
+      tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
     },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
-            grid:{color:'rgba(255,255,255,0.05)'} },
-        y:{ title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
-            grid:{color:'rgba(255,255,255,0.05)'} }
-      }
+    scales:{
+      x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
+          grid:{color:'rgba(255,255,255,0.05)'} },
+      y:{ title:{display:true,text:'H/stage (m)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
+          grid:{color:'rgba(255,255,255,0.05)'} }
     }
-  });
+  }
+});
 }
 
 function drawEta(res, Q_req) {
@@ -422,32 +426,36 @@ function drawEta(res, Q_req) {
   const winQ = Q.slice(p, qIdx+1);
 
   etaChartInst = new Chart(ctx, {
-    type:'line',
-    data:{
-      labels: Qfull.map(q => q.toFixed(1)),
-      datasets:[
-        { label:'\u03b7 Total', data:EtaVals, borderColor:'#60a5fa', borderWidth:2,
-          pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(96,165,250,0.06)' },
-        { label:'Q window', data: Qfull.map((q,i) => {
-            const inW = q >= winQ[0]-0.1 && q <= winQ[winQ.length-1]+0.1;
-            return inW ? EtaVals[i] : null;
-          }), borderColor:'#f59e0b', borderWidth:3, pointRadius:0, tension:0.4,
-          fill:false, spanGaps:false }
-      ]
+  type:'line',
+  data:{
+    labels: Qfull.map(q => q.toFixed(1)),
+    datasets:[
+      { label:'η Total', data:EtaVals, borderColor:'#60a5fa', borderWidth:2,
+        pointRadius:0, tension:0.4, fill:true, backgroundColor:'rgba(96,165,250,0.06)' },
+      { label:'Required Q', data: Qfull.map((q,i) => Math.abs(q - Q_req) < (Qfull[1]-Qfull[0])*0.6 ? EtaVals[i] ?? 0 : null),
+        borderColor:'#f59e0b', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
+      { label:'Selected Q', data: Qfull.map((q,i) => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? EtaVals[i] ?? 0 : null),
+        borderColor:'#f87171', borderWidth:2, borderDash:[5,4], pointRadius:0, fill:false, spanGaps:false },
+      { label:'Selected point', data: Qfull.map(q => Math.abs(q - res.V_selected) < (Qfull[1]-Qfull[0])*0.6 ? (res.eta_max*100) : null),
+        borderColor:'#f87171', borderWidth:0, pointRadius:6, pointBackgroundColor:'#f87171', fill:false }
+    ]
+  },
+  options:{
+    responsive:true, maintainAspectRatio:false,
+    plugins:{
+      legend:{ display:true, labels:{ color:'#7a7f96', font:{family:'DM Mono',size:10}, boxWidth:12 } },
+      tooltip:{ callbacks:{ title: items => `Q = ${items[0].label} l/s` } }
     },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
-            grid:{color:'rgba(255,255,255,0.05)'} },
-        y:{ title:{display:true,text:'\u03b7 total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
-            ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
-            grid:{color:'rgba(255,255,255,0.05)'} }
-      }
+    scales:{
+      x:{ title:{display:true,text:'Q (l/s)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10},maxTicksLimit:10},
+          grid:{color:'rgba(255,255,255,0.05)'} },
+      y:{ title:{display:true,text:'η total (%)',color:'#7a7f96',font:{family:'DM Mono',size:11}},
+          ticks:{color:'#7a7f96',font:{family:'DM Mono',size:10}},
+          grid:{color:'rgba(255,255,255,0.05)'} }
     }
-  });
+  }
+});
 }
 
 function calcNs(rpm, Q, H) { return rpm * Math.pow((Q/1000), 0.5) / Math.pow(H, 0.75); }
@@ -520,7 +528,7 @@ function runSelection() {
   document.getElementById('metricsGrid').innerHTML = `
     <div class="metric highlight"><div class="metric-label">Flow Rate</div><div class="metric-value">${V_selected.toFixed(2)}</div><div class="metric-unit">l/s (operating)</div></div>
     <div class="metric highlight"><div class="metric-label">Total Head</div><div class="metric-value">${H_total.toFixed(2)}</div><div class="metric-unit">m (${num_stages} \u00d7 ${H_selected.toFixed(2)})</div></div>
-    <div class="metric"><div class="metric-label">Efficiency &#951;</div><div class="metric-value">${(eta_max*100).toFixed(1)}<span style="font-size:14px">%</span></div><div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" style="width:${(eta_max*100).toFixed(1)}%"></div></div></div>
+    <div class="metric"><div class="metric-label">Efficiency <span style="font-family:serif">η</span></div><div class="metric-value">${(eta_max*100).toFixed(1)}<span style="font-size:14px">%</span></div><div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" style="width:${(eta_max*100).toFixed(1)}%"></div></div></div>
     <div class="metric"><div class="metric-label">Speed</div><div class="metric-value">${RPM_selected}</div><div class="metric-unit">RPM</div></div>
     <div class="metric"><div class="metric-label">Stages</div><div class="metric-value">${num_stages}</div><div class="metric-unit">in series</div></div>
     <div class="metric"><div class="metric-label">Specific Speed N&#x209B;</div><div class="metric-value">${Ns.toFixed(1)}</div><div class="metric-unit"><span class="ns-badge ${ns.cls}">${ns.label}</span></div></div>
@@ -532,7 +540,7 @@ function runSelection() {
     <tr><td class="label">Flow rate (l/s)</td><td>${Q_req.toFixed(2)}</td><td class="match">${V_selected.toFixed(2)}</td><td style="color:var(--accent)">${qDev > 0?'+':''}${qDev}%</td></tr>
     <tr><td class="label">Total head (m)</td><td>${H_req.toFixed(2)}</td><td class="match">${H_total.toFixed(2)}</td><td style="color:${Math.abs(hDev)>10?'var(--warn)':'var(--accent)'}">${hDev > 0?'+':''}${hDev}%</td></tr>
     <tr><td class="label">Head per stage (m)</td><td>&#8212;</td><td>${H_selected.toFixed(2)}</td><td>&#8212;</td></tr>
-    <tr><td class="label">Efficiency &#951;_total</td><td>&#8212;</td><td>${(eta_max*100).toFixed(2)}%</td><td>&#8212;</td></tr>
+    <tr><td class="label">Efficiency <span style="font-family:serif">η</span>_total</td><td>${(eta_max*100).toFixed(2)}%</td><td>&#8212;</td></tr>
     <tr><td class="label">Number of stages</td><td>&#8212;</td><td>${num_stages}</td><td>&#8212;</td></tr>
   `;
 
